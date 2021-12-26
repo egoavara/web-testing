@@ -14,13 +14,25 @@ import (
 	"time"
 )
 
-func main() {
+func mimicOpenSSLGenrsa() []byte {
 	rawPkey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
 	}
-	cert := &x509.Certificate{
 
+	return pem.EncodeToMemory(&pem.Block{
+		Type: "RSA PRIVATE KEY",
+		// Headers: map[string]string{},
+		Bytes: x509.MarshalPKCS1PrivateKey(rawPkey),
+	})
+}
+func mimicOpenSSLReqNew(pemPkey []byte) []byte {
+	pemPkeyBlock, _ := pem.Decode(pemPkey)
+	pkey, err := x509.ParsePKCS1PrivateKey(pemPkeyBlock.Bytes)
+	if err != nil {
+		panic(err)
+	}
+	cert := &x509.Certificate{
 		Subject: pkix.Name{
 			Country:    []string{"KR"},
 			CommonName: "Hello",
@@ -31,34 +43,29 @@ func main() {
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
-	rawCert, err := x509.CreateCertificate(rand.Reader, cert, cert, &rawPkey.PublicKey, rawPkey)
+	rawCert, err := x509.CreateCertificate(rand.Reader, cert, cert, &pkey.PublicKey, pkey)
 	if err != nil {
 		panic(err)
 	}
-
-	pemPKCS1 := pem.Block{
-		Type: "RSA PRIVATE KEY",
-		// Headers: map[string]string{},
-		Bytes: x509.MarshalPKCS1PrivateKey(rawPkey),
-	}
-	pemCERT := pem.Block{
+	return pem.EncodeToMemory(&pem.Block{
 		Type: "CERTIFICATE",
 		// Headers: map[string]string{},
 		Bytes: rawCert,
-	}
-	fmt.Println("==================")
-	fmt.Println(string(pem.EncodeToMemory(&pemCERT)))
-	fmt.Println("==================")
-	fmt.Println(string(pem.EncodeToMemory(&pemPKCS1)))
-	fmt.Println()
-	fmt.Println()
+	})
+}
+
+func main() {
+	pemPKCS1 := mimicOpenSSLGenrsa()
+	pemCERT := mimicOpenSSLReqNew(pemPKCS1)
+	fmt.Println(string(pemPKCS1))
+	fmt.Println(string(pemCERT))
 	fmt.Println()
 
-	tcpconn, err := net.Listen("tcp", ":8888")
+	tcpconn, err := net.Listen("tcp", ":https")
 	if err != nil {
 		panic(err)
 	}
-	tlscfg, err := tls.X509KeyPair(pem.EncodeToMemory(&pemCERT), pem.EncodeToMemory(&pemPKCS1))
+	tlscfg, err := tls.X509KeyPair(pemCERT, pemPKCS1)
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +75,6 @@ func main() {
 		},
 	})
 	http.Serve(tlsconn, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Println(r)
 		rw.Write([]byte("Hello, World!"))
 		rw.WriteHeader(http.StatusOK)
 	}))
