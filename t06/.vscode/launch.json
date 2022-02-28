@@ -1,0 +1,19 @@
+{
+  "configurations": [
+    {
+      "name": "Launch Program - error",
+      "program": "${workspaceFolder}/commonjs-error/dist/main.js",
+      "request": "launch",
+      "skipFiles": [],
+      "type": "node"
+    },
+
+    {
+      "name": "Launch Program - no error",
+      "program": "${workspaceFolder}/commonjs-no-error/dist/main.js",
+      "request": "launch",
+      "skipFiles": [],
+      "type": "node"
+    }
+  ]
+}
